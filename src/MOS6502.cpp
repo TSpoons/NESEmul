@@ -934,9 +934,17 @@ void MOS6502::RTI_IMP(int &clk, uint8_t (&memory)[0xFFFF]){
 
 // BIT  bit test (accumulator & memory) 
 void MOS6502::BIT_ZP(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint8_t value = memory[zpModeAddr()];
+    SR.set(zero, !(AC & value));
+    SR.set(negative, (value & 0b10000000) != 0);
+    SR.set(overflow, (value & 0b01000000) != 0);
     clk += 3;
 }
 void MOS6502::BIT_ABS(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint8_t value = memory[absModeAddr()];
+    SR.set(zero, !(AC & value));
+    SR.set(negative, (value & 0b10000000) != 0);
+    SR.set(overflow, (value & 0b01000000) != 0);
     clk += 4;
 }
 // NOP  no operation 
