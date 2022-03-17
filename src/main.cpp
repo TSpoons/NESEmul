@@ -12,7 +12,7 @@ int main()
 		cout << "File not opened!";
 	}
 	else {
-		cout << "File opened successfully!";
+		cout << "File opened successfully!" << "\n";
 	}
     MOS6502 CPU = MOS6502();
     CPU.init(romFile);

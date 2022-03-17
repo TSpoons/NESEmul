@@ -14,6 +14,8 @@ private:
     const int ROMADDR = 0x8000;
     const int INTERRUPTVEC = 0xFFFE;
 
+    std::string logBuf;
+
     enum Flags {
         carry,
         zero,
@@ -49,7 +51,7 @@ private:
 
     std::vector<opcodeDef*> opcodeLookup;
 
-    void setReg(uint8_t &reg, uint8_t val);
+    void setReg(uint8_t reg, uint8_t val);
     uint8_t getByte();
 
     uint16_t addPgCross(uint8_t LSB, uint8_t addValue, uint8_t MSB, int &clk, bool addClk);

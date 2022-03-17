@@ -25,13 +25,21 @@ void MOS6502::init(std::ifstream &ROM) {
 void MOS6502::execute() {
     while(1){
         int clk = 0;
+        logBuf = "";
+        std::stringstream stream;
+        stream << std::setw(2) << std::setfill('0') << std::hex << (int)PC;
+        logBuf += stream.str(); 
+        logBuf += " ";
+
         int opcode = getByte();
-        std::cout << opcodeLookup[opcode]->funcName << " ";
         opcodeFuncPtr op = opcodeLookup[opcode]->funcPtr;
         (this->*op)(clk, memory);
-        std::cout << "\n"
-        << "PC: " << std::setw(2) << std::setfill('0') << std::hex << PC << " " 
-        << "AC: " << std::setw(2) << std::setfill('0') << std::hex << AC << " " 
+
+        logBuf.resize((size_t)15, ' ');
+        logBuf += opcodeLookup[opcode]->funcName;
+        logBuf.resize((size_t)30, ' ');
+        std::cout << logBuf;
+        std::cout << "AC: " << std::setw(2) << std::setfill('0') << std::hex << AC << " " 
         << "X: " << std::setw(2) << std::setfill('0') << std::hex << " " 
         << "Y: " << std::setw(2) << std::setfill('0') << std::hex << Y << " " 
         << "SP: " << std::setw(2) << std::setfill('0') << std::hex << SP << " " 
@@ -39,7 +47,7 @@ void MOS6502::execute() {
     }
 }
 
-void MOS6502::setReg(uint8_t &reg, uint8_t val) {
+void MOS6502::setReg(uint8_t reg, uint8_t val) {
     if (val == 0) SR.set(zero);
     else SR.set(zero, false);
 
@@ -50,7 +58,10 @@ void MOS6502::setReg(uint8_t &reg, uint8_t val) {
 }
 
 uint8_t MOS6502::getByte() {
-    std::cout << std::setw(2) << std::setfill('0') << std::hex << (int)memory[PC] << " ";
+    std::stringstream stream;
+    stream << std::setw(2) << std::setfill('0') << std::hex << (int)memory[PC];
+    logBuf += stream.str(); 
+    logBuf += " ";
     return memory[PC++];
 }
 
@@ -869,7 +880,7 @@ void MOS6502::JSR_ABS(int &clk, uint8_t (&memory)[0xFFFF]){
     uint8_t LSB = getByte();
     uint8_t MSB = getByte();
     memory[++SP] = PC;
-    PC = MSB << 8 + LSB;
+    PC = (MSB << 8) + LSB;
     clk += 6;
 }
 // RTS  return from subroutine 
@@ -909,4 +920,6 @@ void MOS6502::RTI_IMP(int &clk, uint8_t (&memory)[0xFFFF]){
 void MOS6502::BIT_ZP(int &clk, uint8_t (&memory)[0xFFFF]){}
 void MOS6502::BIT_ABS(int &clk, uint8_t (&memory)[0xFFFF]){}
 // NOP  no operation 
-void MOS6502::NOP_IMP(int &clk, uint8_t (&memory)[0xFFFF]){}
+void MOS6502::NOP_IMP(int &clk, uint8_t (&memory)[0xFFFF]){
+    clk += 2;
+}
