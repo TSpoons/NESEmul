@@ -10,7 +10,7 @@ MOS6502::MOS6502() {
         opcodeLookup.push_back(NULL);
     }
     for (int i = 0; i < sizeof(opcodes) / sizeof(opcodeDef); i++) {
-        opcodeLookup[opcodes[i].opcodeValue] = opcodes[i].funcPtr;
+        opcodeLookup[opcodes[i].opcodeValue] = &opcodes[i];
     }
 }
 
@@ -26,7 +26,8 @@ void MOS6502::execute() {
     while(1){
         int clk = 0;
         int opcode = getByte();
-        opcodeFuncPtr op = opcodeLookup[opcode];
+        std::cout << opcodeLookup[opcode]->funcName << " ";
+        opcodeFuncPtr op = opcodeLookup[opcode]->funcPtr;
         (this->*op)(clk, memory);
         std::cout << "\n"
         << "PC: " << std::setw(2) << std::setfill('0') << std::hex << PC << " " 
