@@ -854,13 +854,13 @@ void MOS6502::BVS(int &clk, uint8_t (&memory)[0xFFFF]){
 void MOS6502::JMP_ABS(int &clk, uint8_t (&memory)[0xFFFF]){
     uint8_t LSB = getByte();
     uint8_t MSB = getByte();
-    PC = MSB << 8 + LSB;
+    PC = (MSB << 8) + LSB;
     clk += 3;
 }
 void MOS6502::JMP_IND(int &clk, uint8_t (&memory)[0xFFFF]){
     uint8_t LSB = getByte();
     uint8_t MSB = getByte();
-    PC += MSB << 8 + LSB;
+    PC += (MSB << 8) + LSB;
     clk += 5;
 }
 // JSR  jump subroutine 
@@ -883,8 +883,8 @@ void MOS6502::RTS_IMP(int &clk, uint8_t (&memory)[0xFFFF]){
 
 // BRK  break / software interrupt 
 void MOS6502::BRK_IMP(int &clk, uint8_t (&memory)[0xFFFF]){
-    memory[++SP] = PC + 1 >> 8;
-    memory[++SP] = PC + 1 & 0x00FF;
+    memory[++SP] = (PC + 1) >> 8;
+    memory[++SP] = (PC + 1) & 0x00FF;
     memory[++SP] = SR.to_ulong();
     PC = memory[INTERRUPTVEC] + (memory[INTERRUPTVEC + 1] << 8);
     SR.set(brk);
@@ -898,7 +898,7 @@ void MOS6502::RTI_IMP(int &clk, uint8_t (&memory)[0xFFFF]){
 
     uint8_t LSB = memory[SP--];
     uint8_t MSB = memory[SP--];
-    PC = MSB + LSB;
+    PC = (MSB << 8) + LSB;
     clk += 6;
 }
 
