@@ -13,8 +13,10 @@ public:
 private: 
     const int ROMADDR = 0x8000;
     const int INTERRUPTVEC = 0xFFFE;
+    int totalClk;
 
     std::string logBuf;
+    std::string getRegisterLog();
 
     enum Flags {
         carry,
@@ -31,7 +33,7 @@ private:
 
     // Registers
     uint16_t PC = 0x8000;
-    uint16_t SP = 0x0100;
+    uint16_t SP = 0xFD;
     uint8_t AC = 0;
     uint8_t X = 0;
     uint8_t Y = 0;

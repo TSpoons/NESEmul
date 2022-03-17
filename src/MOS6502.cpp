@@ -12,6 +12,8 @@ MOS6502::MOS6502() {
     for (int i = 0; i < sizeof(opcodes) / sizeof(opcodeDef); i++) {
         opcodeLookup[opcodes[i].opcodeValue] = &opcodes[i];
     }
+
+    totalClk = 7;
 }
 
 void MOS6502::init(std::ifstream &ROM) {
@@ -25,11 +27,14 @@ void MOS6502::init(std::ifstream &ROM) {
 void MOS6502::execute() {
     while(1){
         int clk = 0;
+
         logBuf = "";
+        std:: string regLogBuf = getRegisterLog();
         std::stringstream stream;
         stream << std::setw(2) << std::setfill('0') << std::hex << (int)PC;
         logBuf += stream.str(); 
         logBuf += " ";
+
 
         int opcode = getByte();
         opcodeFuncPtr op = opcodeLookup[opcode]->funcPtr;
@@ -38,13 +43,24 @@ void MOS6502::execute() {
         logBuf.resize((size_t)15, ' ');
         logBuf += opcodeLookup[opcode]->funcName;
         logBuf.resize((size_t)30, ' ');
+
+        logBuf += regLogBuf;
         std::cout << logBuf;
-        std::cout << "AC: " << std::setw(2) << std::setfill('0') << std::hex << AC << " " 
-        << "X: " << std::setw(2) << std::setfill('0') << std::hex << " " 
-        << "Y: " << std::setw(2) << std::setfill('0') << std::hex << Y << " " 
-        << "SP: " << std::setw(2) << std::setfill('0') << std::hex << SP << " " 
-        << "SR: " << std::setw(2) << std::setfill('0') << std::hex << SR << "\n";
+
+        totalClk += clk;
     }
+}
+
+std::string MOS6502::getRegisterLog() {
+    std::stringstream stream;
+    stream 
+    << "AC: " << std::setw(2) << std::setfill('0') << std::hex << AC << " " 
+    << "X: " << std::setw(2) << std::setfill('0') << std::hex << " " 
+    << "Y: " << std::setw(2) << std::setfill('0') << std::hex << Y << " " 
+    << "SP: " << std::setw(2) << std::setfill('0') << std::hex << SP << " " 
+    << "SR: " << std::setw(2) << std::setfill('0') << std::hex << SR << " "
+    << "CYC: " << std::dec << totalClk << "\n";
+    return stream.str();
 }
 
 void MOS6502::setReg(uint8_t reg, uint8_t val) {
@@ -917,8 +933,12 @@ void MOS6502::RTI_IMP(int &clk, uint8_t (&memory)[0xFFFF]){
 // Other
 
 // BIT  bit test (accumulator & memory) 
-void MOS6502::BIT_ZP(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::BIT_ABS(int &clk, uint8_t (&memory)[0xFFFF]){}
+void MOS6502::BIT_ZP(int &clk, uint8_t (&memory)[0xFFFF]){
+    clk += 3;
+}
+void MOS6502::BIT_ABS(int &clk, uint8_t (&memory)[0xFFFF]){
+    clk += 4;
+}
 // NOP  no operation 
 void MOS6502::NOP_IMP(int &clk, uint8_t (&memory)[0xFFFF]){
     clk += 2;
