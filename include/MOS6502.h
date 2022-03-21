@@ -4,13 +4,14 @@
 #include <bitset>
 #include <vector>
 
-class MOS6502 {
+class MOS6502
+{
 public:
     MOS6502();
     void init(std::ifstream &ROM);
     void execute();
 
-private: 
+private:
     const int ROMADDR = 0x8000;
     const int INTERRUPTVEC = 0xFFFE;
     int totalClk;
@@ -18,7 +19,8 @@ private:
     std::string logBuf;
     std::string getRegisterLog();
 
-    enum Flags {
+    enum Flags
+    {
         carry,
         zero,
         interrupt,
@@ -32,34 +34,40 @@ private:
     Flags flag = Flags();
 
     // Registers
-    uint16_t PC = 0x8000;
+    uint16_t PC = 0xC000;
     uint16_t SP = 0xFD;
     uint8_t AC = 0;
     uint8_t X = 0;
     uint8_t Y = 0;
     std::bitset<8> SR;
 
-
-
     uint8_t memory[0xFFFF];
-    
-    typedef void (MOS6502::*opcodeFuncPtr)(int&, uint8_t (&memory)[0xFFFF]);
 
-    struct opcodeDef {
+    typedef void (MOS6502::*opcodeFuncPtr)(int &, uint8_t (&memory)[0xFFFF]);
+
+    struct opcodeDef
+    {
         opcodeFuncPtr funcPtr;
         uint8_t opcodeValue;
         std::string funcName;
     };
 
-    std::vector<opcodeDef*> opcodeLookup;
+    std::vector<opcodeDef *> opcodeLookup;
 
-    void setReg(uint8_t reg, uint8_t val);
+    void setReg(uint8_t &reg, uint8_t val);
     uint8_t getByte();
 
     uint16_t addPgCross(uint8_t LSB, uint8_t addValue, uint8_t MSB, int &clk, bool addClk);
     void carryTest(uint16_t value);
+    void overflowTest(uint8_t value);
+    void add(uint8_t value);
+    void sub(uint8_t value);
     void CMPTest(uint8_t reg, uint8_t val);
     void checkBranchPgCross(uint8_t jump, int &clk);
+
+    uint16_t SPToAddr();
+    void pushToStack(uint8_t value);
+    uint8_t pullFromStack();
 
     uint8_t zpModeAddr();
     uint16_t zpindModeAddr(uint8_t addValue);
@@ -77,7 +85,7 @@ private:
 
     // Transfer
 
-    // LDA  load accumulator 
+    // LDA  load accumulator
     void LDA_IM(int &clk, uint8_t (&memory)[0xFFFF]);
     void LDA_ZP(int &clk, uint8_t (&memory)[0xFFFF]);
     void LDA_ZPX(int &clk, uint8_t (&memory)[0xFFFF]);
@@ -92,13 +100,13 @@ private:
     void LDX_ZPY(int &clk, uint8_t (&memory)[0xFFFF]);
     void LDX_ABS(int &clk, uint8_t (&memory)[0xFFFF]);
     void LDX_ABSY(int &clk, uint8_t (&memory)[0xFFFF]);
-    // LDY  load Y 
+    // LDY  load Y
     void LDY_IM(int &clk, uint8_t (&memory)[0xFFFF]);
     void LDY_ZP(int &clk, uint8_t (&memory)[0xFFFF]);
     void LDY_ZPX(int &clk, uint8_t (&memory)[0xFFFF]);
     void LDY_ABS(int &clk, uint8_t (&memory)[0xFFFF]);
     void LDY_ABSX(int &clk, uint8_t (&memory)[0xFFFF]);
-    // STA  store accumulator 
+    // STA  store accumulator
     void STA_ZP(int &clk, uint8_t (&memory)[0xFFFF]);
     void STA_ZPX(int &clk, uint8_t (&memory)[0xFFFF]);
     void STA_ABS(int &clk, uint8_t (&memory)[0xFFFF]);
@@ -106,62 +114,62 @@ private:
     void STA_ABSY(int &clk, uint8_t (&memory)[0xFFFF]);
     void STA_INDX(int &clk, uint8_t (&memory)[0xFFFF]);
     void STA_INDY(int &clk, uint8_t (&memory)[0xFFFF]);
-    // STX  store X 
+    // STX  store X
     void STX_ZP(int &clk, uint8_t (&memory)[0xFFFF]);
     void STX_ZPY(int &clk, uint8_t (&memory)[0xFFFF]);
     void STX_ABS(int &clk, uint8_t (&memory)[0xFFFF]);
-    // STY  store Y 
+    // STY  store Y
     void STY_ZP(int &clk, uint8_t (&memory)[0xFFFF]);
     void STY_ZPX(int &clk, uint8_t (&memory)[0xFFFF]);
     void STY_ABS(int &clk, uint8_t (&memory)[0xFFFF]);
-    // TAX  transfer accumulator to X 
+    // TAX  transfer accumulator to X
     void TAX(int &clk, uint8_t (&memory)[0xFFFF]);
-    // TAY  transfer accumulator to Y 
+    // TAY  transfer accumulator to Y
     void TAY(int &clk, uint8_t (&memory)[0xFFFF]);
-    // TSX  transfer stack pointer to X 
+    // TSX  transfer stack pointer to X
     void TSX(int &clk, uint8_t (&memory)[0xFFFF]);
-    // TXA  transfer X to accumulator 
+    // TXA  transfer X to accumulator
     void TXA(int &clk, uint8_t (&memory)[0xFFFF]);
-    // TXS  transfer X to stack pointer 
+    // TXS  transfer X to stack pointer
     void TXS(int &clk, uint8_t (&memory)[0xFFFF]);
-    // TYA  transfer Y to accumulator 
+    // TYA  transfer Y to accumulator
     void TYA(int &clk, uint8_t (&memory)[0xFFFF]);
 
     // Stack instructions
 
-    // PHA  push accumulator 
+    // PHA  push accumulator
     void PHA(int &clk, uint8_t (&memory)[0xFFFF]);
-    // PHP  push processor status register (with break flag set) 
+    // PHP  push processor status register (with break flag set)
     void PHP(int &clk, uint8_t (&memory)[0xFFFF]);
-    // PLA  pull accumulator 
+    // PLA  pull accumulator
     void PLA(int &clk, uint8_t (&memory)[0xFFFF]);
-    // PLP  pull processor status register 
+    // PLP  pull processor status register
     void PLP(int &clk, uint8_t (&memory)[0xFFFF]);
 
     // Decrements and increments
 
-    // DEC  decrement (memory) 
+    // DEC  decrement (memory)
     void DEC_ZP(int &clk, uint8_t (&memory)[0xFFFF]);
     void DEC_ZPX(int &clk, uint8_t (&memory)[0xFFFF]);
     void DEC_ABS(int &clk, uint8_t (&memory)[0xFFFF]);
     void DEC_ABSX(int &clk, uint8_t (&memory)[0xFFFF]);
-    // DEX  decrement X 
+    // DEX  decrement X
     void DEX(int &clk, uint8_t (&memory)[0xFFFF]);
-    // DEY  decrement Y 
+    // DEY  decrement Y
     void DEY(int &clk, uint8_t (&memory)[0xFFFF]);
-    // INC  increment (memory) 
+    // INC  increment (memory)
     void INC_ZP(int &clk, uint8_t (&memory)[0xFFFF]);
     void INC_ZPX(int &clk, uint8_t (&memory)[0xFFFF]);
     void INC_ABS(int &clk, uint8_t (&memory)[0xFFFF]);
     void INC_ABSX(int &clk, uint8_t (&memory)[0xFFFF]);
-    // INX  increment X 
+    // INX  increment X
     void INX(int &clk, uint8_t (&memory)[0xFFFF]);
-    // INY  increment Y 
+    // INY  increment Y
     void INY(int &clk, uint8_t (&memory)[0xFFFF]);
 
     // Arithmetic operations
 
-    // ADC  add with carry (prepare by CLC) 
+    // ADC  add with carry (prepare by CLC)
     void ADC_IM(int &clk, uint8_t (&memory)[0xFFFF]);
     void ADC_ZP(int &clk, uint8_t (&memory)[0xFFFF]);
     void ADC_ZPX(int &clk, uint8_t (&memory)[0xFFFF]);
@@ -170,7 +178,7 @@ private:
     void ADC_ABSY(int &clk, uint8_t (&memory)[0xFFFF]);
     void ADC_INDX(int &clk, uint8_t (&memory)[0xFFFF]);
     void ADC_INDY(int &clk, uint8_t (&memory)[0xFFFF]);
-    // SBC  subtract with carry (prepare by SEC) 
+    // SBC  subtract with carry (prepare by SEC)
     void SBC_IM(int &clk, uint8_t (&memory)[0xFFFF]);
     void SBC_ZP(int &clk, uint8_t (&memory)[0xFFFF]);
     void SBC_ZPX(int &clk, uint8_t (&memory)[0xFFFF]);
@@ -182,7 +190,7 @@ private:
 
     // Logical operations
 
-    // AND  and (with accumulator) 
+    // AND  and (with accumulator)
     void AND_IM(int &clk, uint8_t (&memory)[0xFFFF]);
     void AND_ZP(int &clk, uint8_t (&memory)[0xFFFF]);
     void AND_ZPX(int &clk, uint8_t (&memory)[0xFFFF]);
@@ -200,7 +208,7 @@ private:
     void EOR_ABSY(int &clk, uint8_t (&memory)[0xFFFF]);
     void EOR_INDX(int &clk, uint8_t (&memory)[0xFFFF]);
     void EOR_INDY(int &clk, uint8_t (&memory)[0xFFFF]);
-    // ORA  (inclusive) or with accumulator 
+    // ORA  (inclusive) or with accumulator
     void ORA_IM(int &clk, uint8_t (&memory)[0xFFFF]);
     void ORA_ZP(int &clk, uint8_t (&memory)[0xFFFF]);
     void ORA_ZPX(int &clk, uint8_t (&memory)[0xFFFF]);
@@ -212,25 +220,25 @@ private:
 
     // Shift and rotate instructions
 
-    // ASL  arithmetic shift left (shifts in a zero bit on the right) 
+    // ASL  arithmetic shift left (shifts in a zero bit on the right)
     void ASL_ACC(int &clk, uint8_t (&memory)[0xFFFF]);
     void ASL_ZP(int &clk, uint8_t (&memory)[0xFFFF]);
     void ASL_ZPX(int &clk, uint8_t (&memory)[0xFFFF]);
     void ASL_ABS(int &clk, uint8_t (&memory)[0xFFFF]);
     void ASL_ABSX(int &clk, uint8_t (&memory)[0xFFFF]);
-    // LSR  logical shift right (shifts in a zero bit on the left) 
+    // LSR  logical shift right (shifts in a zero bit on the left)
     void LSR_ACC(int &clk, uint8_t (&memory)[0xFFFF]);
     void LSR_ZP(int &clk, uint8_t (&memory)[0xFFFF]);
     void LSR_ZPX(int &clk, uint8_t (&memory)[0xFFFF]);
     void LSR_ABS(int &clk, uint8_t (&memory)[0xFFFF]);
     void LSR_ABSX(int &clk, uint8_t (&memory)[0xFFFF]);
-    // ROL  rotate left (shifts in carry bit on the right) 
+    // ROL  rotate left (shifts in carry bit on the right)
     void ROL_ACC(int &clk, uint8_t (&memory)[0xFFFF]);
     void ROL_ZP(int &clk, uint8_t (&memory)[0xFFFF]);
     void ROL_ZPX(int &clk, uint8_t (&memory)[0xFFFF]);
     void ROL_ABS(int &clk, uint8_t (&memory)[0xFFFF]);
     void ROL_ABSX(int &clk, uint8_t (&memory)[0xFFFF]);
-    // ROR  rotate right (shifts in zero bit on the left) 
+    // ROR  rotate right (shifts in zero bit on the left)
     void ROR_ACC(int &clk, uint8_t (&memory)[0xFFFF]);
     void ROR_ZP(int &clk, uint8_t (&memory)[0xFFFF]);
     void ROR_ZPX(int &clk, uint8_t (&memory)[0xFFFF]);
@@ -239,19 +247,19 @@ private:
 
     // Flag instructions
 
-    // CLC  clear carry 
+    // CLC  clear carry
     void CLC(int &clk, uint8_t (&memory)[0xFFFF]);
     // CLD  clear decimal (BCD arithmetics disabled)
     void CLD(int &clk, uint8_t (&memory)[0xFFFF]);
-    // CLI  clear interrupt disable 
+    // CLI  clear interrupt disable
     void CLI(int &clk, uint8_t (&memory)[0xFFFF]);
-    // CLV  clear overflow 
+    // CLV  clear overflow
     void CLV(int &clk, uint8_t (&memory)[0xFFFF]);
-    // SEC  set carry 
+    // SEC  set carry
     void SEC(int &clk, uint8_t (&memory)[0xFFFF]);
-    // SED  set decimal (BCD arithmetics enabled) 
+    // SED  set decimal (BCD arithmetics enabled)
     void SED(int &clk, uint8_t (&memory)[0xFFFF]);
-    // SEI  set interrupt disable 
+    // SEI  set interrupt disable
     void SEI(int &clk, uint8_t (&memory)[0xFFFF]);
 
     // Comparisons
@@ -265,60 +273,151 @@ private:
     void CMP_ABSY(int &clk, uint8_t (&memory)[0xFFFF]);
     void CMP_INDX(int &clk, uint8_t (&memory)[0xFFFF]);
     void CMP_INDY(int &clk, uint8_t (&memory)[0xFFFF]);
-    // CPX  compare with X 
+    // CPX  compare with X
     void CPX_IM(int &clk, uint8_t (&memory)[0xFFFF]);
     void CPX_ZP(int &clk, uint8_t (&memory)[0xFFFF]);
     void CPX_ABS(int &clk, uint8_t (&memory)[0xFFFF]);
-    // CPY  compare with Y 
+    // CPY  compare with Y
     void CPY_IM(int &clk, uint8_t (&memory)[0xFFFF]);
     void CPY_ZP(int &clk, uint8_t (&memory)[0xFFFF]);
     void CPY_ABS(int &clk, uint8_t (&memory)[0xFFFF]);
 
     // Conditional branch instructions
 
-    // BCC  branch on carry clear 
+    // BCC  branch on carry clear
     void BCC(int &clk, uint8_t (&memory)[0xFFFF]);
-    // BCS  branch on carry set 
+    // BCS  branch on carry set
     void BCS(int &clk, uint8_t (&memory)[0xFFFF]);
-    // BEQ  branch on equal (zero set) 
+    // BEQ  branch on equal (zero set)
     void BEQ(int &clk, uint8_t (&memory)[0xFFFF]);
-    // BMI  branch on minus (negative set) 
+    // BMI  branch on minus (negative set)
     void BMI(int &clk, uint8_t (&memory)[0xFFFF]);
-    // BNE  branch on not equal (zero clear) 
+    // BNE  branch on not equal (zero clear)
     void BNE(int &clk, uint8_t (&memory)[0xFFFF]);
-    // BPL   branch on plus (negative clear) 
+    // BPL   branch on plus (negative clear)
     void BPL(int &clk, uint8_t (&memory)[0xFFFF]);
-    // BVC  branch on overflow clear 
+    // BVC  branch on overflow clear
     void BVC(int &clk, uint8_t (&memory)[0xFFFF]);
-    // BVS  branch on overflow set 
+    // BVS  branch on overflow set
     void BVS(int &clk, uint8_t (&memory)[0xFFFF]);
 
     // Jumps and subroutines
 
-    // JMP  jump 
+    // JMP  jump
     void JMP_ABS(int &clk, uint8_t (&memory)[0xFFFF]);
     void JMP_IND(int &clk, uint8_t (&memory)[0xFFFF]);
-    // JSR  jump subroutine 
+    // JSR  jump subroutine
     void JSR_ABS(int &clk, uint8_t (&memory)[0xFFFF]);
-    // RTS  return from subroutine 
+    // RTS  return from subroutine
     void RTS_IMP(int &clk, uint8_t (&memory)[0xFFFF]);
 
     // Interrupts
 
-    // BRK  break / software interrupt 
+    // BRK  break / software interrupt
     void BRK_IMP(int &clk, uint8_t (&memory)[0xFFFF]);
-    // RTI  return from interrupt 
+    // RTI  return from interrupt
     void RTI_IMP(int &clk, uint8_t (&memory)[0xFFFF]);
 
     // Other
 
-    // BIT  bit test (accumulator & memory) 
+    // BIT  bit test (accumulator & memory)
     void BIT_ZP(int &clk, uint8_t (&memory)[0xFFFF]);
     void BIT_ABS(int &clk, uint8_t (&memory)[0xFFFF]);
-    // NOP  no operation 
+    // NOP  no operation
     void NOP_IMP(int &clk, uint8_t (&memory)[0xFFFF]);
 
-    opcodeDef opcodes[151] = {
+    // Illegal opcodes
+    void ALR_IM(int &clk, uint8_t (&memory)[0xFFFF]);
+    void ANC_IM(int &clk, uint8_t (&memory)[0xFFFF]);
+    void ANE_IM(int &clk, uint8_t (&memory)[0xFFFF]);
+    void ARR_IM(int &clk, uint8_t (&memory)[0xFFFF]);
+
+    void DCP_ZP(int &clk, uint8_t (&memory)[0xFFFF]);
+    void DCP_ZPX(int &clk, uint8_t (&memory)[0xFFFF]);
+    void DCP_ABS(int &clk, uint8_t (&memory)[0xFFFF]);
+    void DCP_ABSX(int &clk, uint8_t (&memory)[0xFFFF]);
+    void DCP_ABSY(int &clk, uint8_t (&memory)[0xFFFF]);
+    void DCP_INDX(int &clk, uint8_t (&memory)[0xFFFF]);
+    void DCP_INDY(int &clk, uint8_t (&memory)[0xFFFF]);
+
+    void ISC_ZP(int &clk, uint8_t (&memory)[0xFFFF]);
+    void ISC_ZPX(int &clk, uint8_t (&memory)[0xFFFF]);
+    void ISC_ABS(int &clk, uint8_t (&memory)[0xFFFF]);
+    void ISC_ABSX(int &clk, uint8_t (&memory)[0xFFFF]);
+    void ISC_ABSY(int &clk, uint8_t (&memory)[0xFFFF]);
+    void ISC_INDX(int &clk, uint8_t (&memory)[0xFFFF]);
+    void ISC_INDY(int &clk, uint8_t (&memory)[0xFFFF]);
+
+    void LAS_ABSY(int &clk, uint8_t (&memory)[0xFFFF]);
+
+    void LAX_ZP(int &clk, uint8_t (&memory)[0xFFFF]);
+    void LAX_ZPY(int &clk, uint8_t (&memory)[0xFFFF]);
+    void LAX_ABS(int &clk, uint8_t (&memory)[0xFFFF]);
+    void LAX_ABSY(int &clk, uint8_t (&memory)[0xFFFF]);
+    void LAX_INDX(int &clk, uint8_t (&memory)[0xFFFF]);
+    void LAX_INDY(int &clk, uint8_t (&memory)[0xFFFF]);
+
+    void LXA_IM(int &clk, uint8_t (&memory)[0xFFFF]);
+
+    void RLA_ZP(int &clk, uint8_t (&memory)[0xFFFF]);
+    void RLA_ZPX(int &clk, uint8_t (&memory)[0xFFFF]);
+    void RLA_ABS(int &clk, uint8_t (&memory)[0xFFFF]);
+    void RLA_ABSX(int &clk, uint8_t (&memory)[0xFFFF]);
+    void RLA_ABSY(int &clk, uint8_t (&memory)[0xFFFF]);
+    void RLA_INDX(int &clk, uint8_t (&memory)[0xFFFF]);
+    void RLA_INDY(int &clk, uint8_t (&memory)[0xFFFF]);
+
+    void RRA_ZP(int &clk, uint8_t (&memory)[0xFFFF]);
+    void RRA_ZPX(int &clk, uint8_t (&memory)[0xFFFF]);
+    void RRA_ABS(int &clk, uint8_t (&memory)[0xFFFF]);
+    void RRA_ABSX(int &clk, uint8_t (&memory)[0xFFFF]);
+    void RRA_ABSY(int &clk, uint8_t (&memory)[0xFFFF]);
+    void RRA_INDX(int &clk, uint8_t (&memory)[0xFFFF]);
+    void RRA_INDY(int &clk, uint8_t (&memory)[0xFFFF]);
+
+    void SAX_ZP(int &clk, uint8_t (&memory)[0xFFFF]);
+    void SAX_ZPY(int &clk, uint8_t (&memory)[0xFFFF]);
+    void SAX_ABS(int &clk, uint8_t (&memory)[0xFFFF]);
+    void SAX_INDX(int &clk, uint8_t (&memory)[0xFFFF]);
+
+    void SBX_IM(int &clk, uint8_t (&memory)[0xFFFF]);
+
+    void SHA_ABSY(int &clk, uint8_t (&memory)[0xFFFF]);
+    void SHA_INDY(int &clk, uint8_t (&memory)[0xFFFF]);
+
+    void SHX_ABSY(int &clk, uint8_t (&memory)[0xFFFF]);
+
+    void SHY_ABSX(int &clk, uint8_t (&memory)[0xFFFF]);
+
+    void SLO_ZP(int &clk, uint8_t (&memory)[0xFFFF]);
+    void SLO_ZPX(int &clk, uint8_t (&memory)[0xFFFF]);
+    void SLO_ABS(int &clk, uint8_t (&memory)[0xFFFF]);
+    void SLO_ABSX(int &clk, uint8_t (&memory)[0xFFFF]);
+    void SLO_ABSY(int &clk, uint8_t (&memory)[0xFFFF]);
+    void SLO_INDX(int &clk, uint8_t (&memory)[0xFFFF]);
+    void SLO_INDY(int &clk, uint8_t (&memory)[0xFFFF]);
+
+    void SRE_ZP(int &clk, uint8_t (&memory)[0xFFFF]);
+    void SRE_ZPX(int &clk, uint8_t (&memory)[0xFFFF]);
+    void SRE_ABS(int &clk, uint8_t (&memory)[0xFFFF]);
+    void SRE_ABSX(int &clk, uint8_t (&memory)[0xFFFF]);
+    void SRE_ABSY(int &clk, uint8_t (&memory)[0xFFFF]);
+    void SRE_INDX(int &clk, uint8_t (&memory)[0xFFFF]);
+    void SRE_INDY(int &clk, uint8_t (&memory)[0xFFFF]);
+
+    void TAS_ABSY(int &clk, uint8_t (&memory)[0xFFFF]);
+
+    void USBC_IM(int &clk, uint8_t (&memory)[0xFFFF]);
+
+    void NOP_1B2C(int &clk, uint8_t (&memory)[0xFFFF]);
+    void NOP_2B2C(int &clk, uint8_t (&memory)[0xFFFF]);
+    void NOP_2B3C(int &clk, uint8_t (&memory)[0xFFFF]);
+    void NOP_2B4C(int &clk, uint8_t (&memory)[0xFFFF]);
+    void NOP_3B4C(int &clk, uint8_t (&memory)[0xFFFF]);
+
+    void JAM(int &clk, uint8_t (&memory)[0xFFFF]);
+
+    opcodeDef opcodes[255] = {
         {&MOS6502::LDA_IM, 0xA9, "LDA_IM"},
         {&MOS6502::LDA_ZP, 0xA5, "LDA_ZP"},
         {&MOS6502::LDA_ABS, 0xAD, "LDA_ABS"},
@@ -359,8 +458,8 @@ private:
         {&MOS6502::PHP, 0x08, "PHP"},
         {&MOS6502::PLA, 0x68, "PLA"},
         {&MOS6502::PLP, 0x28, "PLP"},
-        {&MOS6502::DEC_ZP, 0xC6, "DEC_ZP"}, 
-        {&MOS6502::DEC_ZPX, 0xD6, "DEC_ZPX"}, 
+        {&MOS6502::DEC_ZP, 0xC6, "DEC_ZP"},
+        {&MOS6502::DEC_ZPX, 0xD6, "DEC_ZPX"},
         {&MOS6502::DEC_ABS, 0xCE, "DEC_ABS"},
         {&MOS6502::DEC_ABSX, 0xDE, "DEC_ABSX"},
         {&MOS6502::DEX, 0xCA, "DEX"},
@@ -395,11 +494,11 @@ private:
         {&MOS6502::AND_ABSY, 0x39, "AND_ABSY"},
         {&MOS6502::AND_INDX, 0x21, "AND_INDX"},
         {&MOS6502::AND_INDY, 0x31, "AND_INDY"},
-        {&MOS6502::EOR_IM, 0x49, "EOR_IM"}, 
-        {&MOS6502::EOR_ZP, 0x45, "EOR_ZP"}, 
-        {&MOS6502::EOR_ZPX, 0x55, "EOR_ZPX"}, 
+        {&MOS6502::EOR_IM, 0x49, "EOR_IM"},
+        {&MOS6502::EOR_ZP, 0x45, "EOR_ZP"},
+        {&MOS6502::EOR_ZPX, 0x55, "EOR_ZPX"},
         {&MOS6502::EOR_ABS, 0x4D, "EOR_ABS"},
-        {&MOS6502::EOR_ABSX, 0x5D, "EOR_ABSX"}, 
+        {&MOS6502::EOR_ABSX, 0x5D, "EOR_ABSX"},
         {&MOS6502::EOR_ABSY, 0x59, "EOR_ABSY"},
         {&MOS6502::EOR_INDX, 0x41, "EOR_INDX"},
         {&MOS6502::EOR_INDY, 0x51, "EOR_INDY"},
@@ -445,13 +544,13 @@ private:
         {&MOS6502::CMP_ABSX, 0xDD, "CMP_ABSX"},
         {&MOS6502::CMP_ABSY, 0xD9, "CMP_ABSY"},
         {&MOS6502::CMP_INDX, 0xC1, "CMP_INDX"},
-        {&MOS6502::CMP_INDY, 0xD1, "CMP_INDY"}, 
-        {&MOS6502::CPX_IM, 0xE0, "CPX_IM"}, 
+        {&MOS6502::CMP_INDY, 0xD1, "CMP_INDY"},
+        {&MOS6502::CPX_IM, 0xE0, "CPX_IM"},
         {&MOS6502::CPX_ZP, 0xE4, "CPX_ZP"},
-        {&MOS6502::CPX_ABS, 0xEC, "CPX_ABS"}, 
-        {&MOS6502::CPY_IM, 0xE0, "CPY_IM"}, 
-        {&MOS6502::CPY_ZP, 0xE4, "CPY_ZP"},
-        {&MOS6502::CPY_ABS, 0xEC, "CPY_ABS"}, 
+        {&MOS6502::CPX_ABS, 0xEC, "CPX_ABS"},
+        {&MOS6502::CPY_IM, 0xC0, "CPY_IM"},
+        {&MOS6502::CPY_ZP, 0xC4, "CPY_ZP"},
+        {&MOS6502::CPY_ABS, 0xCC, "CPY_ABS"},
         {&MOS6502::BCC, 0x90, "BCC"},
         {&MOS6502::BCS, 0xB0, "BCS"},
         {&MOS6502::BEQ, 0xF0, "BEQ"},
@@ -469,6 +568,109 @@ private:
         {&MOS6502::BIT_ZP, 0x24, "BIT_ZP"},
         {&MOS6502::BIT_ABS, 0x2C, "BIT_ABS"},
         {&MOS6502::NOP_IMP, 0xEA, "NOP_IMP"},
+        {&MOS6502::NOP_IMP, 0xEA, "NOP_IMP"},
+        {&MOS6502::ALR_IM, 0x4B, "ALR_IM"},
+        {&MOS6502::ANC_IM, 0x0B, "ANC_IM"},
+        {&MOS6502::ANC_IM, 0x2B, "ANC_IM"},
+        {&MOS6502::ANE_IM, 0x8B, "ANE_IM"},
+        {&MOS6502::ARR_IM, 0x6B, "ARR_IM"},
+        {&MOS6502::DCP_ZP, 0xC7, "DCP_ZP"},
+        {&MOS6502::DCP_ZPX, 0xD7, "DCP_ZPX"},
+        {&MOS6502::DCP_ABS, 0xCF, "DCP_ABS"},
+        {&MOS6502::DCP_ABSX, 0xDF, "DCP_ABSX"},
+        {&MOS6502::DCP_ABSY, 0xDB, "DCP_ABSY"},
+        {&MOS6502::DCP_INDX, 0xC3, "DCP_INDX"},
+        {&MOS6502::DCP_INDY, 0xD3, "DCP_INDY"},
+        {&MOS6502::ISC_ZP, 0xE7, "ISC_ZP"},
+        {&MOS6502::ISC_ZPX, 0xF7, "ISC_ZPX"},
+        {&MOS6502::ISC_ABS, 0xEF, "ISC_ABS"},
+        {&MOS6502::ISC_ABSX, 0xFF, "ISC_ABSX"},
+        {&MOS6502::ISC_ABSY, 0xFB, "ISC_ABSY"},
+        {&MOS6502::ISC_INDX, 0xE3, "ISC_INDX"},
+        {&MOS6502::ISC_INDY, 0xF3, "ISC_INDY"},
+        {&MOS6502::LAS_ABSY, 0xBB, "LAS_ABSY"},
+        {&MOS6502::LAX_ZP, 0xA7, "LAX_ZP"},
+        {&MOS6502::LAX_ZPY, 0xB7, "LAX_ZPY"},
+        {&MOS6502::LAX_ABS, 0xAF, "LAX_ABS"},
+        {&MOS6502::LAX_ABSY, 0xBF, "LAX_ABSY"},
+        {&MOS6502::LAX_INDX, 0xA3, "LAX_INDX"},
+        {&MOS6502::LAX_INDY, 0xB3, "LAX_INDY"},
+        {&MOS6502::LXA_IM, 0xAB, "LXA_IM"},
+        {&MOS6502::RLA_ZP, 0x27, "RLA_ZP"},
+        {&MOS6502::RLA_ZPX, 0x37, "RLA_ZPX"},
+        {&MOS6502::RLA_ABS, 0x2F, "RLA_ABS"},
+        {&MOS6502::RLA_ABSX, 0x3F, "RLA_ABSX"},
+        {&MOS6502::RLA_ABSY, 0x3B, "RLA_ABSY"},
+        {&MOS6502::RLA_INDX, 0x23, "RLA_INDX"},
+        {&MOS6502::RLA_INDY, 0x33, "RLA_INDY"},
+        {&MOS6502::RRA_ZP, 0x67, "RRA_ZP"},
+        {&MOS6502::RRA_ZPX, 0x77, "RRA_ZPX"},
+        {&MOS6502::RRA_ABS, 0x6F, "RRA_ABS"},
+        {&MOS6502::RRA_ABSX, 0x7F, "RRA_ABSX"},
+        {&MOS6502::RRA_ABSY, 0x7B, "RRA_ABSY"},
+        {&MOS6502::RRA_INDX, 0x63, "RRA_INDX"},
+        {&MOS6502::RRA_INDY, 0x73, "RRA_INDY"},
+        {&MOS6502::SAX_ZP, 0x87, "SAX_ZP"},
+        {&MOS6502::SAX_ZPY, 0x97, "SAX_ZPY"},
+        {&MOS6502::SAX_ABS, 0x8F, "SAX_ABS"},
+        {&MOS6502::SAX_INDX, 0x83, "SAX_INDX"},
+        {&MOS6502::SBX_IM, 0xCB, "SBX_IM"},
+        {&MOS6502::SHA_ABSY, 0x9F, "SHA_ABSY"},
+        {&MOS6502::SHA_INDY, 0x93, "SHA_INDY"},
+        {&MOS6502::SHX_ABSY, 0x9E, "SHX_ABSY"},
+        {&MOS6502::SHY_ABSX, 0x9C, "SHY_ABSX"},
+        {&MOS6502::SLO_ZP, 0x07, "SLO_ZP"},
+        {&MOS6502::SLO_ZPX, 0x17, "SLO_ZPX"},
+        {&MOS6502::SLO_ABS, 0x0F, "SLO_ABS"},
+        {&MOS6502::SLO_ABSX, 0x1F, "SLO_ABSX"},
+        {&MOS6502::SLO_ABSY, 0x1B, "SLO_ABSY"},
+        {&MOS6502::SLO_INDX, 0x03, "SLO_INDX"},
+        {&MOS6502::SLO_INDY, 0x13, "SLO_INDY"},
+        {&MOS6502::SRE_ZP, 0x47, "SRE_ZP"},
+        {&MOS6502::SRE_ZPX, 0x57, "SRE_ZPX"},
+        {&MOS6502::SRE_ABS, 0x4F, "SRE_ABS"},
+        {&MOS6502::SRE_ABSX, 0x5F, "SRE_ABSX"},
+        {&MOS6502::SRE_ABSY, 0x5B, "SRE_ABSY"},
+        {&MOS6502::SRE_INDX, 0x43, "SRE_INDX"},
+        {&MOS6502::SRE_INDY, 0x53, "SRE_INDY"},
+        {&MOS6502::TAS_ABSY, 0x9B, "TAS_ABSY"},
+        {&MOS6502::USBC_IM, 0xEB, "USBC_IM"},
+        {&MOS6502::NOP_1B2C, 0x1A, "NOP_1B2C"},
+        {&MOS6502::NOP_1B2C, 0x3A, "NOP_1B2C"},
+        {&MOS6502::NOP_1B2C, 0x5A, "NOP_1B2C"},
+        {&MOS6502::NOP_1B2C, 0x7A, "NOP_1B2C"},
+        {&MOS6502::NOP_2B2C, 0x80, "NOP_2B2C"},
+        {&MOS6502::NOP_2B2C, 0x82, "NOP_2B2C"},
+        {&MOS6502::NOP_2B2C, 0x89, "NOP_2B2C"},
+        {&MOS6502::NOP_2B2C, 0xC2, "NOP_2B2C"},
+        {&MOS6502::NOP_2B2C, 0xE2, "NOP_2B2C"},
+        {&MOS6502::NOP_2B3C, 0x04, "NOP_2B3C"},
+        {&MOS6502::NOP_2B3C, 0x44, "NOP_2B3C"},
+        {&MOS6502::NOP_2B3C, 0x64, "NOP_2B3C"},
+        {&MOS6502::NOP_2B4C, 0x14, "NOP_2B4C"},
+        {&MOS6502::NOP_2B4C, 0x34, "NOP_2B4C"},
+        {&MOS6502::NOP_2B4C, 0x54, "NOP_2B4C"},
+        {&MOS6502::NOP_2B4C, 0x74, "NOP_2B4C"},
+        {&MOS6502::NOP_2B4C, 0xD4, "NOP_2B4C"},
+        {&MOS6502::NOP_2B4C, 0xF4, "NOP_2B4C"},
+        {&MOS6502::NOP_3B4C, 0x0C, "NOP_3B4C"},
+        {&MOS6502::NOP_3B4C, 0x1C, "NOP_3B4C"},
+        {&MOS6502::NOP_3B4C, 0x3C, "NOP_3B4C"},
+        {&MOS6502::NOP_3B4C, 0x5C, "NOP_3B4C"},
+        {&MOS6502::NOP_3B4C, 0x7C, "NOP_3B4C"},
+        {&MOS6502::NOP_3B4C, 0xDC, "NOP_3B4C"},
+        {&MOS6502::NOP_3B4C, 0xFC, "NOP_3B4C"},
+        {&MOS6502::JAM, 0x02, "JAM"}, 
+        {&MOS6502::JAM, 0x12, "JAM"}, 
+        {&MOS6502::JAM, 0x22, "JAM"}, 
+        {&MOS6502::JAM, 0x32, "JAM"}, 
+        {&MOS6502::JAM, 0x42, "JAM"}, 
+        {&MOS6502::JAM, 0x52, "JAM"}, 
+        {&MOS6502::JAM, 0x62, "JAM"}, 
+        {&MOS6502::JAM, 0x72, "JAM"}, 
+        {&MOS6502::JAM, 0x92, "JAM"}, 
+        {&MOS6502::JAM, 0xB2, "JAM"}, 
+        {&MOS6502::JAM, 0xD2, "JAM"}, 
+        {&MOS6502::JAM, 0xF2, "JAM"}
     };
 };
-
