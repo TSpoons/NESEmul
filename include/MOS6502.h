@@ -1,3 +1,4 @@
+#pragma once
 #include <stdint.h>
 #include <iostream>
 #include <fstream>
@@ -9,13 +10,13 @@ class MOS6502
 public:
     MOS6502();
     void init(std::ifstream &ROM);
-    void execute();
+    void executeOP(uint8_t (&memory)[0xFFFF]);
 
 private:
-    const int ROMADDR = 0x8000;
     const int INTERRUPTVEC = 0xFFFE;
     int totalClk;
 
+    std::ofstream CPULogFile;
     std::string logBuf;
     std::string getRegisterLog();
 
@@ -41,8 +42,6 @@ private:
     uint8_t Y = 0;
     std::bitset<8> SR;
 
-    uint8_t memory[0xFFFF];
-
     typedef void (MOS6502::*opcodeFuncPtr)(int &, uint8_t (&memory)[0xFFFF]);
 
     struct opcodeDef
@@ -55,7 +54,7 @@ private:
     std::vector<opcodeDef *> opcodeLookup;
 
     void setReg(uint8_t &reg, uint8_t val);
-    uint8_t getByte();
+    uint8_t getByte(uint8_t (&memory)[0xFFFF]);
 
     uint16_t addPgCross(uint8_t LSB, uint8_t addValue, uint8_t MSB, int &clk, bool addClk);
     void carryTest(uint16_t value);
@@ -66,15 +65,15 @@ private:
     void checkBranchPgCross(int8_t jump, int &clk);
 
     uint16_t SPToAddr();
-    void pushToStack(uint8_t value);
-    uint8_t pullFromStack();
+    void pushToStack(uint8_t value, uint8_t (&memory)[0xFFFF]);
+    uint8_t pullFromStack(uint8_t (&memory)[0xFFFF]);
 
-    uint8_t zpModeAddr();
-    uint16_t zpindModeAddr(uint8_t addValue);
-    uint16_t absModeAddr();
-    uint16_t absindModeAddr(uint8_t addValue, int &clk, bool addClk);
-    uint16_t indxModeAddr();
-    uint16_t indyModeAddr(int &clk, bool addClk);
+    uint8_t zpModeAddr(uint8_t (&memory)[0xFFFF]);
+    uint16_t zpindModeAddr(uint8_t addValue, uint8_t (&memory)[0xFFFF]);
+    uint16_t absModeAddr(uint8_t (&memory)[0xFFFF]);
+    uint16_t absindModeAddr(uint8_t addValue, uint8_t (&memory)[0xFFFF], int &clk, bool addClk);
+    uint16_t indxModeAddr(uint8_t (&memory)[0xFFFF]);
+    uint16_t indyModeAddr(uint8_t (&memory)[0xFFFF], int &clk, bool addClk);
 
     void ASLMem(uint8_t &memVal);
     void LSRMem(uint8_t &memVal);
