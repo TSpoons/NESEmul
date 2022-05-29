@@ -63,7 +63,7 @@ private:
     void add(uint8_t value);
     void sub(uint8_t value);
     void CMPTest(uint8_t reg, uint8_t val);
-    void checkBranchPgCross(uint8_t jump, int &clk);
+    void checkBranchPgCross(int8_t jump, int &clk);
 
     uint16_t SPToAddr();
     void pushToStack(uint8_t value);
@@ -409,17 +409,20 @@ private:
 
     void USBC_IM(int &clk, uint8_t (&memory)[0xFFFF]);
 
+    void NOP_0B2C(int &clk, uint8_t (&memory)[0xFFFF]);
     void NOP_1B2C(int &clk, uint8_t (&memory)[0xFFFF]);
     void NOP_2B2C(int &clk, uint8_t (&memory)[0xFFFF]);
-    void NOP_2B3C(int &clk, uint8_t (&memory)[0xFFFF]);
-    void NOP_2B4C(int &clk, uint8_t (&memory)[0xFFFF]);
-    void NOP_3B4C(int &clk, uint8_t (&memory)[0xFFFF]);
+    void NOP_1B3C(int &clk, uint8_t (&memory)[0xFFFF]);
+    void NOP_1B4C(int &clk, uint8_t (&memory)[0xFFFF]);
+    void NOP_2B4C(int &clk, uint8_t (&memory)[0xFFFF]); 
+    void NOP_2B45C(int &clk, uint8_t (&memory)[0xFFFF]);
 
     void JAM(int &clk, uint8_t (&memory)[0xFFFF]);
 
-    opcodeDef opcodes[255] = {
+    opcodeDef opcodes[258] = {
         {&MOS6502::LDA_IM, 0xA9, "LDA_IM"},
         {&MOS6502::LDA_ZP, 0xA5, "LDA_ZP"},
+        {&MOS6502::LDA_ZPX, 0xB5, "LDA_ZPX"},
         {&MOS6502::LDA_ABS, 0xAD, "LDA_ABS"},
         {&MOS6502::LDA_ABSX, 0xBD, "LDA_ABSX"},
         {&MOS6502::LDA_ABSY, 0xB9, "LDA_ABSY"},
@@ -635,42 +638,44 @@ private:
         {&MOS6502::SRE_INDY, 0x53, "SRE_INDY"},
         {&MOS6502::TAS_ABSY, 0x9B, "TAS_ABSY"},
         {&MOS6502::USBC_IM, 0xEB, "USBC_IM"},
-        {&MOS6502::NOP_1B2C, 0x1A, "NOP_1B2C"},
-        {&MOS6502::NOP_1B2C, 0x3A, "NOP_1B2C"},
-        {&MOS6502::NOP_1B2C, 0x5A, "NOP_1B2C"},
-        {&MOS6502::NOP_1B2C, 0x7A, "NOP_1B2C"},
-        {&MOS6502::NOP_2B2C, 0x80, "NOP_2B2C"},
+        {&MOS6502::NOP_0B2C, 0x1A, "NOP_0B2C"},
+        {&MOS6502::NOP_0B2C, 0x3A, "NOP_0B2C"},
+        {&MOS6502::NOP_0B2C, 0x5A, "NOP_0B2C"},
+        {&MOS6502::NOP_0B2C, 0x7A, "NOP_0B2C"},
+        {&MOS6502::NOP_0B2C, 0xDA, "NOP_0B2C"},
+        {&MOS6502::NOP_0B2C, 0xFA, "NOP_0B2C"},
+        {&MOS6502::NOP_1B2C, 0x80, "NOP_1B2C"},
         {&MOS6502::NOP_2B2C, 0x82, "NOP_2B2C"},
         {&MOS6502::NOP_2B2C, 0x89, "NOP_2B2C"},
         {&MOS6502::NOP_2B2C, 0xC2, "NOP_2B2C"},
         {&MOS6502::NOP_2B2C, 0xE2, "NOP_2B2C"},
-        {&MOS6502::NOP_2B3C, 0x04, "NOP_2B3C"},
-        {&MOS6502::NOP_2B3C, 0x44, "NOP_2B3C"},
-        {&MOS6502::NOP_2B3C, 0x64, "NOP_2B3C"},
-        {&MOS6502::NOP_2B4C, 0x14, "NOP_2B4C"},
-        {&MOS6502::NOP_2B4C, 0x34, "NOP_2B4C"},
-        {&MOS6502::NOP_2B4C, 0x54, "NOP_2B4C"},
-        {&MOS6502::NOP_2B4C, 0x74, "NOP_2B4C"},
-        {&MOS6502::NOP_2B4C, 0xD4, "NOP_2B4C"},
-        {&MOS6502::NOP_2B4C, 0xF4, "NOP_2B4C"},
-        {&MOS6502::NOP_3B4C, 0x0C, "NOP_3B4C"},
-        {&MOS6502::NOP_3B4C, 0x1C, "NOP_3B4C"},
-        {&MOS6502::NOP_3B4C, 0x3C, "NOP_3B4C"},
-        {&MOS6502::NOP_3B4C, 0x5C, "NOP_3B4C"},
-        {&MOS6502::NOP_3B4C, 0x7C, "NOP_3B4C"},
-        {&MOS6502::NOP_3B4C, 0xDC, "NOP_3B4C"},
-        {&MOS6502::NOP_3B4C, 0xFC, "NOP_3B4C"},
-        {&MOS6502::JAM, 0x02, "JAM"}, 
-        {&MOS6502::JAM, 0x12, "JAM"}, 
-        {&MOS6502::JAM, 0x22, "JAM"}, 
-        {&MOS6502::JAM, 0x32, "JAM"}, 
-        {&MOS6502::JAM, 0x42, "JAM"}, 
-        {&MOS6502::JAM, 0x52, "JAM"}, 
-        {&MOS6502::JAM, 0x62, "JAM"}, 
-        {&MOS6502::JAM, 0x72, "JAM"}, 
-        {&MOS6502::JAM, 0x92, "JAM"}, 
-        {&MOS6502::JAM, 0xB2, "JAM"}, 
-        {&MOS6502::JAM, 0xD2, "JAM"}, 
+        {&MOS6502::NOP_1B3C, 0x04, "NOP_1B3C"},
+        {&MOS6502::NOP_1B3C, 0x44, "NOP_1B3C"},
+        {&MOS6502::NOP_1B3C, 0x64, "NOP_1B3C"},
+        {&MOS6502::NOP_1B4C, 0x14, "NOP_1B4C"},
+        {&MOS6502::NOP_1B4C, 0x34, "NOP_1B4C"},
+        {&MOS6502::NOP_1B4C, 0x54, "NOP_1B4C"},
+        {&MOS6502::NOP_1B4C, 0x74, "NOP_1B4C"},
+        {&MOS6502::NOP_1B4C, 0xD4, "NOP_1B4C"},
+        {&MOS6502::NOP_1B4C, 0xF4, "NOP_1B4C"},
+        {&MOS6502::NOP_2B4C, 0x0C, "NOP_2B4C"},
+        {&MOS6502::NOP_2B45C, 0x1C, "NOP_2B45C"},
+        {&MOS6502::NOP_2B45C, 0x3C, "NOP_2B45C"},
+        {&MOS6502::NOP_2B45C, 0x5C, "NOP_2B45C"},
+        {&MOS6502::NOP_2B45C, 0x7C, "NOP_2B45C"},
+        {&MOS6502::NOP_2B45C, 0xDC, "NOP_2B45C"},
+        {&MOS6502::NOP_2B45C, 0xFC, "NOP_2B45C"},
+        {&MOS6502::JAM, 0x02, "JAM"},
+        {&MOS6502::JAM, 0x12, "JAM"},
+        {&MOS6502::JAM, 0x22, "JAM"},
+        {&MOS6502::JAM, 0x32, "JAM"},
+        {&MOS6502::JAM, 0x42, "JAM"},
+        {&MOS6502::JAM, 0x52, "JAM"},
+        {&MOS6502::JAM, 0x62, "JAM"},
+        {&MOS6502::JAM, 0x72, "JAM"},
+        {&MOS6502::JAM, 0x92, "JAM"},
+        {&MOS6502::JAM, 0xB2, "JAM"},
+        {&MOS6502::JAM, 0xD2, "JAM"},
         {&MOS6502::JAM, 0xF2, "JAM"}
     };
 };

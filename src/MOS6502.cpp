@@ -34,25 +34,26 @@ void MOS6502::execute() {
         logBuf = "";
         std:: string regLogBuf = getRegisterLog();
         std::stringstream stream;
-        stream << std::setw(2) << std::setfill('0') << std::hex << std::uppercase << (int)PC;
+        stream << std::setw(4) << std::setfill('0') << std::hex << std::uppercase << (int)PC;
         logBuf += stream.str(); 
         logBuf += "  ";
-
 
         int opcode = getByte();
         opcodeFuncPtr op = opcodeLookup[opcode]->funcPtr;
         (this->*op)(clk, memory);
 
         logBuf.resize((size_t)15, ' ');
-        //logBuf += opcodeLookup[opcode]->funcName;
+        logBuf += opcodeLookup[opcode]->funcName;
         logBuf.resize((size_t)26, ' ');
 
         logBuf += regLogBuf;
-        logFile << logBuf;
+        logFile.write(&logBuf[0], logBuf.size());
+        logFile.flush();
 
         totalClk += clk;
     }
 }
+
 
 std::string MOS6502::getRegisterLog() {
     std::stringstream stream;
@@ -82,11 +83,11 @@ uint8_t MOS6502::getByte() {
 
 uint16_t MOS6502::addPgCross(uint8_t LSB, uint8_t addValue, uint8_t MSB, int &clk, bool addClk) {
     uint16_t LSBAdd = LSB + addValue;
-    if ((LSBAdd > 0x00FF) & addClk) {
-        MSB += LSBAdd & 0xFF00;
+    uint16_t MSBAdd = MSB;
+    if ((LSBAdd > 0xFF) && addClk) {
         clk++;
     }
-    return (LSBAdd & 0x00FF) + (MSB & 0xFF00);
+    return (MSBAdd << 8) + LSBAdd;
 }
 
 uint8_t MOS6502::zpModeAddr() {
@@ -94,7 +95,7 @@ uint8_t MOS6502::zpModeAddr() {
 }
 
 uint16_t MOS6502::zpindModeAddr(uint8_t addValue) {
-    return (getByte() + addValue) % 0xFF;
+    return (getByte() + addValue) & 0xFF;
 }
 
 uint16_t MOS6502::absModeAddr() {
@@ -104,39 +105,23 @@ uint16_t MOS6502::absModeAddr() {
 }
 
 uint16_t MOS6502::absindModeAddr(uint8_t addValue, int &clk, bool addClk) {
-    return addPgCross(getByte(), X, getByte(), clk, addClk);
+    uint8_t LSB = getByte();
+    uint8_t MSB = getByte();
+    return addPgCross(LSB, addValue, MSB, clk, addClk);
 }
 
 uint16_t MOS6502::indxModeAddr() {
     uint16_t memAddr = getByte() + X;
-    return X & 0xFF;
+    uint8_t LSB = memory[memAddr & 0xFF];
+    uint8_t MSB = memory[((memAddr + 1) & 0xFF)];
+    return (MSB << 8) + LSB;
 }
 
 uint16_t MOS6502::indyModeAddr(int &clk, bool addClk) {
     uint8_t memAddr = getByte();
-    return addPgCross(memory[memAddr], Y, memory[memAddr + 1], clk, addClk);
-}
-
-void MOS6502::ASLMem(uint8_t &memVal) {
-    SR.set(carry, memVal & 0x80);
-    memVal = memVal << 1;
-}
-
-void MOS6502::LSRMem(uint8_t &memVal) {
-    SR.set(carry, memVal & 0x01);
-    memVal = memVal >> 1;
-}
-
-void MOS6502::ROLMem(uint8_t &memVal) {
-    uint8_t carryVal = memVal & 0x80;
-    memVal = (memVal << 1) | SR[carry];
-    SR.set(carry, carryVal);
-}
-
-void MOS6502::RORMem(uint8_t &memVal) {
-    uint8_t carryVal = memVal & 0x01;
-    memVal = (memVal >> 1) | (SR[carry] << 8);
-    SR.set(carry, carryVal);
+    uint8_t LSB = memory[memAddr];
+    uint8_t MSB = memory[(memAddr + 1) & 0xFF];
+    return addPgCross(LSB, Y, MSB, clk, addClk);
 }
 
 // LDA  load accumulator 
@@ -149,7 +134,7 @@ void MOS6502::LDA_ZP(int &clk, uint8_t (&memory)[0xFFFF]){
     clk += 3;
 }
 void MOS6502::LDA_ZPX(int &clk, uint8_t (&memory)[0xFFFF]){
-    setReg(AC, memory[(getByte() + X) % 0xFF]);
+    setReg(AC, memory[zpindModeAddr(X)]);
     clk += 4;
 }
 void MOS6502::LDA_ABS(int &clk, uint8_t (&memory)[0xFFFF]){
@@ -170,7 +155,7 @@ void MOS6502::LDA_INDX(int &clk, uint8_t (&memory)[0xFFFF]){
 }
 void MOS6502::LDA_INDY(int &clk, uint8_t (&memory)[0xFFFF]){
     setReg(AC, memory[indyModeAddr(clk, true)]);
-    clk += 6;
+    clk += 5;
 }
 
 // LDX  load X
@@ -229,11 +214,11 @@ void MOS6502::STA_ABS(int &clk, uint8_t (&memory)[0xFFFF]){
     clk += 4;
 }
 void MOS6502::STA_ABSX(int &clk, uint8_t (&memory)[0xFFFF]){
-    memory[absindModeAddr(X, clk, true)] = AC;
+    memory[absindModeAddr(X, clk, false)] = AC;
     clk += 5;
 }
 void MOS6502::STA_ABSY(int &clk, uint8_t (&memory)[0xFFFF]){
-    memory[absindModeAddr(Y, clk, true)] = AC;
+    memory[absindModeAddr(Y, clk, false)] = AC;
     clk += 5;
 }
 void MOS6502::STA_INDX(int &clk, uint8_t (&memory)[0xFFFF]){
@@ -342,19 +327,23 @@ void MOS6502::PLP(int &clk, uint8_t (&memory)[0xFFFF]){
 
 // DEC  decrement (memory) 
 void MOS6502::DEC_ZP(int &clk, uint8_t (&memory)[0xFFFF]){
-    memory[zpModeAddr()]--;
+    uint16_t addr = zpModeAddr();
+    setReg(memory[addr], memory[addr] - 1);
     clk += 5;
 }
 void MOS6502::DEC_ZPX(int &clk, uint8_t (&memory)[0xFFFF]){
-    memory[zpindModeAddr(X)]--;
+    uint16_t addr = zpindModeAddr(X);
+    setReg(memory[addr], memory[addr] - 1);
     clk += 6;
 }
 void MOS6502::DEC_ABS(int &clk, uint8_t (&memory)[0xFFFF]){
-    memory[absModeAddr()]--;
+    uint16_t addr = absModeAddr();
+    setReg(memory[addr], memory[addr] - 1);
     clk += 6;
 }
 void MOS6502::DEC_ABSX(int &clk, uint8_t (&memory)[0xFFFF]){
-    memory[absindModeAddr(X, clk, false)]--;
+    uint16_t addr = absindModeAddr(X, clk, false);
+    setReg(memory[addr], memory[addr] - 1);
     clk += 7;
 }
 // DEX  decrement X 
@@ -369,19 +358,23 @@ void MOS6502::DEY(int &clk, uint8_t (&memory)[0xFFFF]){
 }
 // INC  increment (memory) 
 void MOS6502::INC_ZP(int &clk, uint8_t (&memory)[0xFFFF]){
-    memory[zpModeAddr()]++;
+    uint16_t addr = zpModeAddr();
+    setReg(memory[addr], memory[addr] + 1);
     clk += 5;
 }
 void MOS6502::INC_ZPX(int &clk, uint8_t (&memory)[0xFFFF]){
-    memory[zpindModeAddr(X)]++;
+    uint16_t addr = zpindModeAddr(X);
+    setReg(memory[addr], memory[addr] + 1);
     clk += 6;
 }
 void MOS6502::INC_ABS(int &clk, uint8_t (&memory)[0xFFFF]){
-    memory[absModeAddr()]++;
+    uint16_t addr = absModeAddr();
+    setReg(memory[addr], memory[addr] + 1);
     clk += 6;
 }
 void MOS6502::INC_ABSX(int &clk, uint8_t (&memory)[0xFFFF]){
-    memory[absindModeAddr(X, clk, false)]++;
+    uint16_t addr = absindModeAddr(X, clk, false);
+    setReg(memory[addr], memory[addr] + 1);
     clk += 7;
 }
 // INX  increment X 
@@ -417,7 +410,7 @@ void MOS6502::overflowTest(uint8_t value) {
 }
 
 void MOS6502::add(uint8_t value) {
-    uint16_t sum = AC + value + SR[carry];
+    uint16_t sum = AC + value + SR.test(carry);
     uint8_t result = sum & 0xFFU;
     SR.set(carry, sum >> 8);  
     SR.set(overflow, !!((AC ^ result) & (value ^ result) & 0x80U));  
@@ -552,15 +545,15 @@ void MOS6502::EOR_ABSX(int &clk, uint8_t (&memory)[0xFFFF]){
     clk += 4;
 }
 void MOS6502::EOR_ABSY(int &clk, uint8_t (&memory)[0xFFFF]){
-    setReg(AC, AC & memory[absindModeAddr(Y, clk, true)]);
+    setReg(AC, AC ^ memory[absindModeAddr(Y, clk, true)]);
     clk += 4;
 }
 void MOS6502::EOR_INDX(int &clk, uint8_t (&memory)[0xFFFF]){
-    setReg(AC, AC & memory[indxModeAddr()]);
+    setReg(AC, AC ^ memory[indxModeAddr()]);
     clk += 6;
 }
 void MOS6502::EOR_INDY(int &clk, uint8_t (&memory)[0xFFFF]){
-    setReg(AC, AC & memory[indyModeAddr(clk, true)]);
+    setReg(AC, AC ^ memory[indyModeAddr(clk, true)]);
     clk += 5;
 }
 // ORA  (inclusive) or with accumulator 
@@ -598,6 +591,27 @@ void MOS6502::ORA_INDY(int &clk, uint8_t (&memory)[0xFFFF]){
 }
 
 // Shift and rotate instructions
+void MOS6502::ASLMem(uint8_t &memVal) {
+    SR.set(carry, memVal & 0x80);
+    setReg(memVal, memVal << 1);
+}
+
+void MOS6502::LSRMem(uint8_t &memVal) {
+    SR.set(carry, memVal & 0x01);
+    setReg(memVal, memVal >> 1);
+}
+
+void MOS6502::ROLMem(uint8_t &memVal) {
+    uint8_t carryVal = memVal & 0x80;
+    setReg(memVal, (memVal << 1) | SR.test(carry));
+    SR.set(carry, carryVal);
+}
+
+void MOS6502::RORMem(uint8_t &memVal) {
+    uint8_t carryVal = memVal & 0x01;
+    setReg(memVal, (memVal | (SR.test(carry) << 8)) >> 1);
+    SR.set(carry, carryVal);
+}
 
 // ASL  arithmetic shift left (shifts in a zero bit on the right) 
 void MOS6502::ASL_ACC(int &clk, uint8_t (&memory)[0xFFFF]){
@@ -646,7 +660,7 @@ void MOS6502::LSR_ABSX(int &clk, uint8_t (&memory)[0xFFFF]){
 // ROL  rotate left (shifts in carry bit on the right) 
 void MOS6502::ROL_ACC(int &clk, uint8_t (&memory)[0xFFFF]){
     uint8_t carryVal = AC & 0x80;
-    setReg(AC, (AC << 1) | SR[carry]);
+    setReg(AC, (AC << 1) | SR.test(carry));
     SR.set(carry, carryVal);
     clk += 2;
 }
@@ -669,7 +683,7 @@ void MOS6502::ROL_ABSX(int &clk, uint8_t (&memory)[0xFFFF]){
 // ROR  rotate right (shifts in zero bit on the left) 
 void MOS6502::ROR_ACC(int &clk, uint8_t (&memory)[0xFFFF]){
     uint8_t carryVal = AC & 0x01;
-    setReg(AC, (AC >> 1) | (SR[carry] << 7));
+    setReg(AC, (AC >> 1) | (SR.test(carry) << 7));
     SR.set(carry, carryVal);
     clk += 2;
 }
@@ -797,14 +811,16 @@ void MOS6502::CPY_ABS(int &clk, uint8_t (&memory)[0xFFFF]){
 }
 
 // Conditional branch instructions
-void MOS6502::checkBranchPgCross(uint8_t jump, int &clk){
-    if ((PC % 256 + jump) > 256) clk++;
+void MOS6502::checkBranchPgCross(int8_t jump, int &clk){
+    if ((PC % 256 + jump) > 255) {
+        clk++;
+    }
 }
 
 // BCC  branch on carry clear 
 void MOS6502::BCC(int &clk, uint8_t (&memory)[0xFFFF]){
     uint8_t jump = getByte();
-    if (!SR[carry]){
+    if (!SR.test(carry)){
         checkBranchPgCross(jump, clk);
         PC += jump;
         clk++;
@@ -814,7 +830,7 @@ void MOS6502::BCC(int &clk, uint8_t (&memory)[0xFFFF]){
 // BCS  branch on carry set 
 void MOS6502::BCS(int &clk, uint8_t (&memory)[0xFFFF]){
     uint8_t jump = getByte();
-    if (SR[carry]){
+    if (SR.test(carry)){
         checkBranchPgCross(jump, clk);
         PC += jump;
         clk++;
@@ -824,7 +840,7 @@ void MOS6502::BCS(int &clk, uint8_t (&memory)[0xFFFF]){
 // BEQ  branch on equal (zero set) 
 void MOS6502::BEQ(int &clk, uint8_t (&memory)[0xFFFF]){
     uint8_t jump = getByte();
-    if (SR[zero]){
+    if (SR.test(zero)){
         checkBranchPgCross(jump, clk);
         PC += jump;
         clk++;
@@ -834,7 +850,7 @@ void MOS6502::BEQ(int &clk, uint8_t (&memory)[0xFFFF]){
 // BMI  branch on minus (negative set) 
 void MOS6502::BMI(int &clk, uint8_t (&memory)[0xFFFF]){
     uint8_t jump = getByte();
-    if (SR[negative]){
+    if (SR.test(negative)){
         checkBranchPgCross(jump, clk);
         PC += jump;
         clk++;
@@ -843,8 +859,8 @@ void MOS6502::BMI(int &clk, uint8_t (&memory)[0xFFFF]){
 }
 // BNE  branch on not equal (zero clear) 
 void MOS6502::BNE(int &clk, uint8_t (&memory)[0xFFFF]){
-    uint8_t jump = getByte();
-    if (!SR[zero]){
+    int8_t jump = getByte();
+    if (!SR.test(zero)){
         checkBranchPgCross(jump, clk);
         PC += jump;
         clk++;
@@ -854,7 +870,7 @@ void MOS6502::BNE(int &clk, uint8_t (&memory)[0xFFFF]){
 // BPL   branch on plus (negative clear) 
 void MOS6502::BPL(int &clk, uint8_t (&memory)[0xFFFF]){
     uint8_t jump = getByte();
-    if (!SR[negative]){
+    if (!SR.test(negative)){
         checkBranchPgCross(jump, clk);
         PC += jump;
         clk++;
@@ -864,7 +880,7 @@ void MOS6502::BPL(int &clk, uint8_t (&memory)[0xFFFF]){
 // BVC  branch on overflow clear 
 void MOS6502::BVC(int &clk, uint8_t (&memory)[0xFFFF]){
     uint8_t jump = getByte();
-    if (!SR[overflow]){
+    if (!SR.test(overflow)){
         checkBranchPgCross(jump, clk);
         PC += jump;
         clk = 1; // 3 cycles no matter the adress
@@ -874,7 +890,7 @@ void MOS6502::BVC(int &clk, uint8_t (&memory)[0xFFFF]){
 // BVS  branch on overflow set 
 void MOS6502::BVS(int &clk, uint8_t (&memory)[0xFFFF]){
     uint8_t jump = getByte();
-    if (SR[overflow]){
+    if (SR.test(overflow)){
         checkBranchPgCross(jump, clk);
         PC += jump;
         clk++;
@@ -886,24 +902,24 @@ void MOS6502::BVS(int &clk, uint8_t (&memory)[0xFFFF]){
 
 // JMP  jump 
 void MOS6502::JMP_ABS(int &clk, uint8_t (&memory)[0xFFFF]){
-    uint8_t LSB = getByte();
-    uint8_t MSB = getByte();
-    PC = (MSB << 8) + LSB;
+    PC = absModeAddr();
     clk += 3;
 }
 void MOS6502::JMP_IND(int &clk, uint8_t (&memory)[0xFFFF]){
-    uint8_t LSB = getByte();
-    uint8_t MSB = getByte();
-    PC += (MSB << 8) + LSB;
+    uint16_t addr = absModeAddr();
+    if ((addr & 0x00FF) == 0xFF) {
+        PC = (memory[addr & 0xFF00] << 8) + memory[addr];
+    }
+    else 
+        PC = (memory[addr + 1] << 8) + memory[addr];
     clk += 5;
 }
 // JSR  jump subroutine 
 void MOS6502::JSR_ABS(int &clk, uint8_t (&memory)[0xFFFF]){
-    uint8_t LSB = getByte();
-    uint8_t MSB = getByte();
+    uint16_t addr = absModeAddr();
     pushToStack((PC - 1) >> 8);
     pushToStack((PC - 1) & 0x00FF);
-    PC = (MSB << 8) + LSB;
+    PC = addr;
     clk += 6;
 }
 // RTS  return from subroutine 
@@ -977,67 +993,327 @@ void MOS6502::ANE_IM(int &clk, uint8_t (&memory)[0xFFFF]){
     clk += 2;
 }
 void MOS6502::ARR_IM(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::DCP_ZP(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::DCP_ZPX(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::DCP_ABS(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::DCP_ABSX(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::DCP_ABSY(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::DCP_INDX(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::DCP_INDY(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::ISC_ZP(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::ISC_ZPX(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::ISC_ABS(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::ISC_ABSX(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::ISC_ABSY(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::ISC_INDX(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::ISC_INDY(int &clk, uint8_t (&memory)[0xFFFF]){}
+void MOS6502::DCP_ZP(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = zpModeAddr();
+    memory[addr]--;
+    CMPTest(AC, memory[addr]);
+    clk += 5;
+}
+void MOS6502::DCP_ZPX(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = zpindModeAddr(X);
+    memory[addr]--;
+    CMPTest(AC, memory[addr]);
+    clk += 6;
+}
+void MOS6502::DCP_ABS(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = absModeAddr();
+    memory[addr]--;
+    CMPTest(AC, memory[addr]);
+    clk += 6;
+}
+void MOS6502::DCP_ABSX(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = absindModeAddr(X, clk, false);
+    memory[addr]--;
+    CMPTest(AC, memory[addr]);
+    clk += 7;
+}
+void MOS6502::DCP_ABSY(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = absindModeAddr(Y, clk, false);
+    memory[addr]--;
+    CMPTest(AC, memory[addr]);
+    clk += 7;
+}
+void MOS6502::DCP_INDX(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = indxModeAddr();
+    memory[addr]--;
+    CMPTest(AC, memory[addr]);
+    clk += 8;
+}
+void MOS6502::DCP_INDY(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = indyModeAddr(clk, false);
+    memory[addr]--;
+    CMPTest(AC, memory[addr]);
+    clk += 8;
+}
+void MOS6502::ISC_ZP(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = zpModeAddr();
+    memory[addr]++;
+    sub(memory[addr]);
+    clk += 5;
+}
+void MOS6502::ISC_ZPX(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = zpindModeAddr(X);
+    memory[addr]++;
+    sub(memory[addr]);
+    clk += 6;
+}
+void MOS6502::ISC_ABS(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = absModeAddr();
+    memory[addr]++;
+    sub(memory[addr]);
+    clk += 6;
+}
+void MOS6502::ISC_ABSX(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = absindModeAddr(X, clk, false);
+    memory[addr]++;
+    sub(memory[addr]);
+    clk += 7;
+}
+void MOS6502::ISC_ABSY(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = absindModeAddr(Y, clk, false);
+    memory[addr]++;
+    sub(memory[addr]);
+    clk += 7;
+}
+void MOS6502::ISC_INDX(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = indxModeAddr();
+    memory[addr]++;
+    sub(memory[addr]);
+    clk += 8;
+}
+void MOS6502::ISC_INDY(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = indyModeAddr(clk, false);
+    memory[addr]++;
+    sub(memory[addr]);
+    clk += 8;
+}
 void MOS6502::LAS_ABSY(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::LAX_ZP(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::LAX_ZPY(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::LAX_ABS(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::LAX_ABSY(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::LAX_INDX(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::LAX_INDY(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::LXA_IM(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::RLA_ZP(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::RLA_ZPX(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::RLA_ABS(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::RLA_ABSX(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::RLA_ABSY(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::RLA_INDX(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::RLA_INDY(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::RRA_ZP(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::RRA_ZPX(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::RRA_ABS(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::RRA_ABSX(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::RRA_ABSY(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::RRA_INDX(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::RRA_INDY(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::SAX_ZP(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::SAX_ZPY(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::SAX_ABS(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::SAX_INDX(int &clk, uint8_t (&memory)[0xFFFF]){}
+void MOS6502::LAX_ZP(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint8_t value = memory[zpModeAddr()];
+    setReg(AC, value);
+    setReg(X, value);
+    clk += 3;
+}
+void MOS6502::LAX_ZPY(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint8_t value = memory[zpindModeAddr(Y)];
+    setReg(AC, value);
+    setReg(X, value);
+    clk += 4;
+}
+void MOS6502::LAX_ABS(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint8_t value = memory[absModeAddr()];
+    setReg(AC, value);
+    setReg(X, value);
+    clk += 4;
+}
+void MOS6502::LAX_ABSY(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint8_t value = memory[absindModeAddr(Y, clk, true)];
+    setReg(AC, value);
+    setReg(X, value);
+    clk += 4;
+}
+void MOS6502::LAX_INDX(int &clk, uint8_t (&memory)[0xFFFF]) {
+    uint8_t value = memory[indxModeAddr()];
+    setReg(AC, value);
+    setReg(X, value);
+    clk += 6;
+}
+void MOS6502::LAX_INDY(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint8_t value = memory[indyModeAddr(clk, true)];
+    setReg(AC, value);
+    setReg(X, value);
+    clk += 5;
+}
+// unstable, not implemented
+void MOS6502::LXA_IM(int &clk, uint8_t (&memory)[0xFFFF]){
+    clk += 2;
+}
+void MOS6502::RLA_ZP(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = zpModeAddr();
+    ROLMem(memory[addr]);
+    setReg(AC, AC & memory[addr]);
+    clk += 5;
+}
+void MOS6502::RLA_ZPX(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = zpindModeAddr(X);
+    ROLMem(memory[addr]);
+    setReg(AC, AC & memory[addr]);
+    clk += 6;
+}
+void MOS6502::RLA_ABS(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = absModeAddr();
+    ROLMem(memory[addr]);
+    setReg(AC, AC & memory[addr]);
+    clk += 6;
+}
+void MOS6502::RLA_ABSX(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = absindModeAddr(X, clk, false);
+    ROLMem(memory[addr]);
+    setReg(AC, AC & memory[addr]);
+    clk += 7;
+}
+void MOS6502::RLA_ABSY(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = absindModeAddr(Y, clk, false);
+    ROLMem(memory[addr]);
+    setReg(AC, AC & memory[addr]);
+    clk += 7;
+}
+void MOS6502::RLA_INDX(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = indxModeAddr();
+    ROLMem(memory[addr]);
+    setReg(AC, AC & memory[addr]);
+    clk += 8;
+}
+void MOS6502::RLA_INDY(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = indyModeAddr(clk, false);
+    ROLMem(memory[addr]);
+    setReg(AC, AC & memory[addr]);
+    clk += 8;
+}
+void MOS6502::RRA_ZP(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = zpModeAddr();
+    RORMem(memory[addr]);
+    add(memory[addr]);
+    clk += 5;
+}
+void MOS6502::RRA_ZPX(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = zpindModeAddr(X);
+    RORMem(memory[addr]);
+    add(memory[addr]);
+    clk += 6;
+}
+void MOS6502::RRA_ABS(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = absModeAddr();
+    RORMem(memory[addr]);
+    add(memory[addr]);
+    clk += 6;
+}
+void MOS6502::RRA_ABSX(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = absindModeAddr(X, clk, false);
+    RORMem(memory[addr]);
+    add(memory[addr]);
+    clk += 7;
+}
+void MOS6502::RRA_ABSY(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = absindModeAddr(Y, clk, false);
+    RORMem(memory[addr]);
+    add(memory[addr]);
+    clk += 7;
+}
+void MOS6502::RRA_INDX(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = indxModeAddr();
+    RORMem(memory[addr]);
+    add(memory[addr]);
+    clk += 8;
+}
+void MOS6502::RRA_INDY(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = indyModeAddr(clk, false);
+    RORMem(memory[addr]);
+    add(memory[addr]);
+    clk += 8;
+}
+void MOS6502::SAX_ZP(int &clk, uint8_t (&memory)[0xFFFF]){
+    memory[zpModeAddr()] = AC & X;
+    clk += 3;
+}
+void MOS6502::SAX_ZPY(int &clk, uint8_t (&memory)[0xFFFF]){
+    memory[zpindModeAddr(Y)] = AC & X;
+    clk += 4;
+}
+void MOS6502::SAX_ABS(int &clk, uint8_t (&memory)[0xFFFF]){
+    memory[absModeAddr()] = AC & X;
+    clk += 4;
+}
+void MOS6502::SAX_INDX(int &clk, uint8_t (&memory)[0xFFFF]){
+    memory[indxModeAddr()] = AC & X;
+    clk += 6;
+}
 void MOS6502::SBX_IM(int &clk, uint8_t (&memory)[0xFFFF]){}
 void MOS6502::SHA_ABSY(int &clk, uint8_t (&memory)[0xFFFF]){}
 void MOS6502::SHA_INDY(int &clk, uint8_t (&memory)[0xFFFF]){}
 void MOS6502::SHX_ABSY(int &clk, uint8_t (&memory)[0xFFFF]){}
 void MOS6502::SHY_ABSX(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::SLO_ZP(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::SLO_ZPX(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::SLO_ABS(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::SLO_ABSX(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::SLO_ABSY(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::SLO_INDX(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::SLO_INDY(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::SRE_ZP(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::SRE_ZPX(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::SRE_ABS(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::SRE_ABSX(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::SRE_ABSY(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::SRE_INDX(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::SRE_INDY(int &clk, uint8_t (&memory)[0xFFFF]){}
+void MOS6502::SLO_ZP(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = zpModeAddr();
+    ASLMem(memory[addr]);
+    setReg(AC, AC | memory[addr]);
+    clk += 5;
+}
+void MOS6502::SLO_ZPX(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = zpindModeAddr(X);
+    ASLMem(memory[addr]);
+    setReg(AC, AC | memory[addr]);
+    clk += 6;
+}
+void MOS6502::SLO_ABS(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = absModeAddr();
+    ASLMem(memory[addr]);
+    setReg(AC, AC | memory[addr]);
+    clk += 6;
+}
+void MOS6502::SLO_ABSX(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = absindModeAddr(X, clk, false);
+    ASLMem(memory[addr]);
+    setReg(AC, AC | memory[addr]);
+    clk += 7;
+}
+void MOS6502::SLO_ABSY(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = absindModeAddr(Y, clk, false);
+    ASLMem(memory[addr]);
+    setReg(AC, AC | memory[addr]);
+    clk += 7;
+}
+void MOS6502::SLO_INDX(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = indxModeAddr();
+    ASLMem(memory[addr]);
+    setReg(AC, AC | memory[addr]);
+    clk += 8;
+}
+void MOS6502::SLO_INDY(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = indyModeAddr(clk, false);
+    ASLMem(memory[addr]);
+    setReg(AC, AC | memory[addr]);
+    clk += 8;
+}
+void MOS6502::SRE_ZP(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = zpModeAddr();
+    LSRMem(memory[addr]);
+    setReg(AC, AC ^ memory[addr]);
+    clk += 5;
+}
+void MOS6502::SRE_ZPX(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = zpindModeAddr(X);
+    LSRMem(memory[addr]);
+    setReg(AC, AC ^ memory[addr]);
+    clk += 6;
+}
+void MOS6502::SRE_ABS(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = absModeAddr();
+    LSRMem(memory[addr]);
+    setReg(AC, AC ^ memory[addr]);
+    clk += 6;
+}
+void MOS6502::SRE_ABSX(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = absindModeAddr(X, clk, false);
+    LSRMem(memory[addr]);
+    setReg(AC, AC ^ memory[addr]);
+    clk += 7;
+}
+void MOS6502::SRE_ABSY(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = absindModeAddr(Y, clk, false);
+    LSRMem(memory[addr]);
+    setReg(AC, AC ^ memory[addr]);
+    clk += 7;
+}
+void MOS6502::SRE_INDX(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = indxModeAddr();
+    LSRMem(memory[addr]);
+    setReg(AC, AC ^ memory[addr]);
+    clk += 8;
+}
+void MOS6502::SRE_INDY(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint16_t addr = indyModeAddr(clk, false);
+    LSRMem(memory[addr]);
+    setReg(AC, AC ^ memory[addr]);
+    clk += 8;
+}
 void MOS6502::TAS_ABSY(int &clk, uint8_t (&memory)[0xFFFF]){}
-void MOS6502::USBC_IM(int &clk, uint8_t (&memory)[0xFFFF]){}
+void MOS6502::USBC_IM(int &clk, uint8_t (&memory)[0xFFFF]){
+    SBC_IM(clk, memory);
+}
+void MOS6502::NOP_0B2C(int &clk, uint8_t (&memory)[0xFFFF]){
+    clk += 2;
+}
 void MOS6502::NOP_1B2C(int &clk, uint8_t (&memory)[0xFFFF]){
     getByte();
     clk += 2;
@@ -1047,20 +1323,24 @@ void MOS6502::NOP_2B2C(int &clk, uint8_t (&memory)[0xFFFF]){
     getByte();
     clk += 2;
 }
-void MOS6502::NOP_2B3C(int &clk, uint8_t (&memory)[0xFFFF]){
-    getByte();
+void MOS6502::NOP_1B3C(int &clk, uint8_t (&memory)[0xFFFF]){
     getByte();
     clk += 3;
+}
+void MOS6502::NOP_1B4C(int &clk, uint8_t (&memory)[0xFFFF]){
+    getByte();
+    clk += 4;
 }
 void MOS6502::NOP_2B4C(int &clk, uint8_t (&memory)[0xFFFF]){
     getByte();
     getByte();
     clk += 4;
 }
-void MOS6502::NOP_3B4C(int &clk, uint8_t (&memory)[0xFFFF]){
-    getByte();
-    getByte();
-    getByte();
+void MOS6502::NOP_2B45C(int &clk, uint8_t (&memory)[0xFFFF]){
+    uint8_t LSB = getByte();
+    uint8_t MSB = getByte();
+    addPgCross(LSB, X, MSB, clk, true);
     clk += 4;
 }
+
 void MOS6502::JAM(int &clk, uint8_t (&memory)[0xFFFF]){}
