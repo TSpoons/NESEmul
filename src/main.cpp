@@ -7,12 +7,13 @@ using namespace std;
 int main()
 {
     ifstream romFile;
-	romFile.open("../ROMS/Super-Mario-Bros.nes", ios::binary);
+	romFile.open("ROMS/snake.bin", ios::binary);
 	if (!romFile) {
 		cout << "File not opened!";
+		exit(1);
 	}
 	else {
-		// cout << "File opened successfully!" << "\n";
+		cout << "File opened successfully!" << "\n";
 	}
     Controller controller = Controller(romFile);
     controller.run();

@@ -5,13 +5,16 @@
 #include <fstream>
 
 MOS6502::MOS6502() {
-    CPULogFile.open("../ROMS/CPULogFile.txt", std::ofstream::out | std::ofstream::trunc);
+    CPULogFile.open("ROMS/CPULogFile.txt", std::ofstream::out | std::ofstream::trunc);
 
     // Fill opcode lookup table
     for (int i = 0; i < 256; i++) {
         opcodeLookup.push_back(NULL);
     }
-    for (int i = 0; i < sizeof(opcodes) / sizeof(opcodeDef); i++) {
+    for (int i = 0; i < 256; i++) {
+        if (opcodes[i].opcodeValue == 0x0) {
+            int x = 0;
+        }
         opcodeLookup[opcodes[i].opcodeValue] = &opcodes[i];
     }
     SR.set(interrupt);
@@ -30,6 +33,7 @@ void MOS6502::executeOP(uint8_t (&memory)[0xFFFF]) {
     logBuf += "  ";
 
     int opcode = getByte(memory);
+    auto test = opcodeLookup[opcode];
     opcodeFuncPtr op = opcodeLookup[opcode]->funcPtr;
     (this->*op)(clk, memory);
 

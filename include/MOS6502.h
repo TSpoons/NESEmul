@@ -418,7 +418,7 @@ private:
 
     void JAM(int &clk, uint8_t (&memory)[0xFFFF]);
 
-    opcodeDef opcodes[258] = {
+    opcodeDef opcodes[256] = {
         {&MOS6502::LDA_IM, 0xA9, "LDA_IM"},
         {&MOS6502::LDA_ZP, 0xA5, "LDA_ZP"},
         {&MOS6502::LDA_ZPX, 0xB5, "LDA_ZPX"},
@@ -565,11 +565,9 @@ private:
         {&MOS6502::JMP_IND, 0x6C, "JMP_IND"},
         {&MOS6502::JSR_ABS, 0x20, "JSR_ABS"},
         {&MOS6502::RTS_IMP, 0x60, "RTS_IMP"},
-        {&MOS6502::BRK_IMP, 0x00, "BRK_IMP"},
         {&MOS6502::RTI_IMP, 0x40, "RTI_IMP"},
         {&MOS6502::BIT_ZP, 0x24, "BIT_ZP"},
         {&MOS6502::BIT_ABS, 0x2C, "BIT_ABS"},
-        {&MOS6502::NOP_IMP, 0xEA, "NOP_IMP"},
         {&MOS6502::NOP_IMP, 0xEA, "NOP_IMP"},
         {&MOS6502::ALR_IM, 0x4B, "ALR_IM"},
         {&MOS6502::ANC_IM, 0x0B, "ANC_IM"},
@@ -675,6 +673,7 @@ private:
         {&MOS6502::JAM, 0x92, "JAM"},
         {&MOS6502::JAM, 0xB2, "JAM"},
         {&MOS6502::JAM, 0xD2, "JAM"},
-        {&MOS6502::JAM, 0xF2, "JAM"}
+        {&MOS6502::JAM, 0xF2, "JAM"},
+        {&MOS6502::BRK_IMP, 0x00, "BRK_IMP"},
     };
 };
